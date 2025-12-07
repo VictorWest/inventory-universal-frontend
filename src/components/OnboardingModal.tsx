@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import IndustrySetup from './IndustrySetup';
+import { getSessionEmail } from '@/lib/session';
+import { updateIndustry } from '@/shared/constants';
 
 interface OnboardingModalProps {
   isOpen: boolean;
@@ -12,13 +14,13 @@ interface OnboardingModalProps {
 
 const industries = [
   { id: 'hospitality', name: 'Hospitality', subtitle: 'Lounge, Bar, Hotel, Restaurant', icon: '🏨', group: 'GROUP 1' },
-  { id: 'retail', name: 'Retail & Supermarket', subtitle: 'Stores, Markets, QSR', icon: '🛒', group: 'GROUP 1' },
-  { id: 'healthcare', name: 'Healthcare', subtitle: 'Hospital, Pharmacy, Clinic', icon: '🏥', group: 'GROUP 2' },
-  { id: 'education', name: 'Education', subtitle: 'School, University, Ministry', icon: '🎓', group: 'GROUP 3' },
-  { id: 'office', name: 'Office/Administration', subtitle: 'Corporate, NGO, Admin', icon: '🏢', group: 'GROUP 3' },
-  { id: 'agriculture', name: 'Agriculture/Farming', subtitle: 'Farm, Livestock, Agro', icon: '🌾', group: 'GROUP 4' },
-  { id: 'manufacturing', name: 'Manufacturing', subtitle: 'Factory, Construction', icon: '🏭', group: 'GROUP 5' },
-  { id: 'general', name: 'General Purpose', subtitle: 'Multi-Industry, Custom', icon: '⚙️', group: 'GROUP 6' },
+  { id: 'retail', name: 'Retail & Supermarket', subtitle: 'Stores, Markets, QSR', icon: '🛒', group: 'GROUP 2' },
+  { id: 'healthcare', name: 'Healthcare', subtitle: 'Hospital, Pharmacy, Clinic', icon: '🏥', group: 'GROUP 3' },
+  { id: 'education', name: 'Education', subtitle: 'School, University, Ministry', icon: '🎓', group: 'GROUP 4' },
+  { id: 'office', name: 'Office/Administration', subtitle: 'Corporate, NGO, Admin', icon: '🏢', group: 'GROUP 5' },
+  { id: 'agriculture', name: 'Agriculture/Farming', subtitle: 'Farm, Livestock, Agro', icon: '🌾', group: 'GROUP 6' },
+  { id: 'manufacturing', name: 'Manufacturing', subtitle: 'Factory, Construction', icon: '🏭', group: 'GROUP 7' },
+  { id: 'general', name: 'General Purpose', subtitle: 'Multi-Industry, Custom', icon: '⚙️', group: 'GROUP 8' },
 ];
 
 const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onIndustrySelect }) => {
@@ -35,8 +37,16 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onIndustrySel
     }
   };
 
-  const handleFinishSetup = () => {
-    onIndustrySelect(selectedIndustry);
+  const handleFinishSetup = async () => {
+    const email = getSessionEmail()
+
+    const response = await fetch(updateIndustry(email, selectedIndustry), {
+      method: "POST"
+    })
+
+    if (response.ok){
+      onIndustrySelect(selectedIndustry)
+    }
   };
 
   const handleBack = () => {

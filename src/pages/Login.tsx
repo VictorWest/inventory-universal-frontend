@@ -1,32 +1,51 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { setSessionEmail } from "@/lib/session";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { LOGIN_API_URL } from "@/shared/constants";
+import { ClipLoader } from "react-spinners"
+import { IoMdEyeOff, IoMdEye } from "react-icons/io";
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [viewPassword, setViewPassword] = useState(false)
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
-            const response = await fetch(LOGIN_API_URL, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({ email, password })
-            })
-            if (response.ok){
-                navigate("/");
-            }
+          setLoading(true)
+          setError("")
+          const response = await fetch(LOGIN_API_URL, {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ email, password })
+          })
+          if (response.ok){
+            // store the logged-in user's email in a client-side cookie (fallback)
+            setSessionEmail(email);
+
+            // Optionally, if the backend returned a JSON payload with user info,
+            // you could read it here: const payload = await response.json();
+
+            navigate("/");
+          } else {
+            setError("Invalid credentials")
+          }
         } catch (error) {
             console.log(error)
+        } finally {
+          setLoading(false)
         }
   };
 
@@ -55,23 +74,39 @@ const Login: React.FC = () => {
 
               <div>
                 <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  className="mt-2"
-                />
+                <div className="flex items-center relative">
+                  <Input
+                    id="password"
+                    type={viewPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    required
+                    className="mt-2"
+                  />
+                  <div onClick={() => setViewPassword(prev => !prev)} className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer">{viewPassword ? <IoMdEye /> : <IoMdEyeOff />}</div>
+                </div>
               </div>
 
               <div className="flex items-center justify-between">
-                <Link to="/" className="text-sm text-muted-foreground hover:underline">Forgot password?</Link>
+                {/* <Link to="/" className="text-sm text-muted-foreground hover:underline">Forgot password?</Link> */}
+                <p className="text-xs text-red-500 hover:underline">{error}</p>
               </div>
 
               <div>
-                <Button type="submit" className="w-full">Sign in</Button>
+                <Button type="submit" className="w-full">
+                  {loading ? 
+                    <ClipLoader
+                      color={"white"}
+                      loading={loading}
+                      size={15}
+                      aria-label="Loading Spinner"
+                      data-testid="loader"
+                    /> 
+                    :
+                    <p>Sign in</p>
+                  }
+                </Button>
               </div>
             </form>
           </CardContent>
