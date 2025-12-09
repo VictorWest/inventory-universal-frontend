@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useIndustryFeatures } from '@/hooks/useIndustryConfig';
 import { Plus } from 'lucide-react';
+import { ClipLoader } from 'react-spinners';
 
 interface AddItemFormProps {
   isOpen: boolean;
@@ -27,33 +28,41 @@ const AddItemForm: React.FC<AddItemFormProps> = ({ isOpen, onClose, onAdd }) => 
     batch: '',
     barcode: ''
   });
+  const [loading, setLoading] = useState(false)
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.name || !formData.sku) return;
-    
-    const newItem = {
-      id: Date.now().toString(),
-      ...formData,
-      sellingPrice: industryFeatures.hasSellingPrice ? formData.sellingPrice : undefined,
-      expiry: industryFeatures.hasExpiryTracking ? formData.expiry : undefined,
-      batch: industryFeatures.hasBatchTracking ? formData.batch : undefined
-    };
-    
-    onAdd(newItem);
-    setFormData({
-      sku: '',
-      name: '',
-      category: '',
-      unit: '',
-      costPrice: 0,
-      sellingPrice: 0,
-      stock: 0,
-      expiry: '',
-      batch: '',
-      barcode: ''
+    try {
+      setLoading(true)
+      e.preventDefault();
+      if (!formData.name || !formData.sku) return;
+      
+      const newItem = {
+        id: Date.now().toString(),
+        ...formData,
+        sellingPrice: industryFeatures.hasSellingPrice ? formData.sellingPrice : undefined,
+        expiry: industryFeatures.hasExpiryTracking ? formData.expiry : undefined,
+        batch: industryFeatures.hasBatchTracking ? formData.batch : undefined
+      };
+      
+      onAdd(newItem);
+      setFormData({
+        sku: '',
+        name: '',
+        category: '',
+        unit: '',
+        costPrice: 0,
+        sellingPrice: 0,
+        stock: 0,
+        expiry: '',
+        batch: '',
+        barcode: ''
     });
-    onClose();
+    } catch (error) {
+      console.log(error)
+    } finally {
+      setLoading(false)
+    }
+    // onClose();
   };
 
   return (
@@ -182,8 +191,20 @@ const AddItemForm: React.FC<AddItemFormProps> = ({ isOpen, onClose, onAdd }) => 
               Cancel
             </Button>
             <Button type="submit">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Item
+              {loading ? 
+                <ClipLoader
+                  color={"white"}
+                  loading={loading}
+                  size={15}
+                  aria-label="Loading Spinner"
+                  data-testid="loader"
+                /> 
+                :
+                <p>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Add Item
+                </p>
+              }
             </Button>
           </div>
         </form>

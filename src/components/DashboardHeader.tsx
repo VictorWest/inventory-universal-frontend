@@ -5,6 +5,7 @@ import { Menu, Bell, User, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { clearSession, getSessionEmail } from '@/lib/session';
+import { getBusinessName } from '@/lib/session';
 
 interface DashboardHeaderProps {
   companyName: string;
@@ -16,6 +17,8 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ companyName, industry
   const { toggleSidebar } = useAppContext();
   const navigate = useNavigate();
   const email = typeof window !== 'undefined' ? getSessionEmail() : null;
+  const businessName = typeof window !== 'undefined' ? getBusinessName() : null;
+  const displayName = businessName || email;
 
   return (
     <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
@@ -40,8 +43,8 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = ({ companyName, industry
           <Settings className="h-5 w-5" />
         </Button>
         <div className="flex items-center space-x-2">
-          {email && (
-            <div className="text-sm text-muted-foreground mr-2">{email}</div>
+          {displayName && (
+            <div className="text-sm text-muted-foreground mr-2">{displayName}</div>
           )}
           <Button variant="ghost" size="sm" onClick={async () => {
             // attempt server logout (if backend supports it)

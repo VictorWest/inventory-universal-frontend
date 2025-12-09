@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { setSessionEmail } from "@/lib/session";
+import { setSessionEmail, setBusinessName } from "@/lib/session";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,8 +35,11 @@ const Login: React.FC = () => {
             // store the logged-in user's email in a client-side cookie (fallback)
             setSessionEmail(email);
 
-            // Optionally, if the backend returned a JSON payload with user info,
-            // you could read it here: const payload = await response.json();
+            // Extract businessName from response if available
+            const payload = await response.json();
+            if (payload?.businessName) {
+              setBusinessName(payload.businessName);
+            }
 
             navigate("/");
           } else {

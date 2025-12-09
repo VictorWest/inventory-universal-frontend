@@ -26,10 +26,31 @@ export function getSessionEmail(): string | null {
 export function clearSession() {
   // expire the cookie
   document.cookie = `${COOKIE_NAME}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;SameSite=Lax`;
+  clearBusinessName();
 }
 
 export function isAuthenticated(): boolean {
   return !!getSessionEmail();
+}
+
+// LocalStorage helpers for businessName (display only)
+export function setBusinessName(businessName: string) {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('businessName', businessName);
+  }
+}
+
+export function getBusinessName(): string | null {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('businessName');
+  }
+  return null;
+}
+
+export function clearBusinessName() {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('businessName');
+  }
 }
 
 // Attempt to validate session with backend. Returns user info object if available, otherwise null.

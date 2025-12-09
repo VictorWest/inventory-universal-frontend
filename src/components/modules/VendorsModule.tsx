@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, Search, Phone, Mail, MapPin, TrendingUp, ShoppingCart } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { ADD_SUPPLIERS_LIST, GET_SUPPLIERS_LIST } from '@/shared/constants';
 
 interface Supplier {
   id: string;
@@ -34,36 +35,36 @@ interface MarketPriceItem {
   unit: string;
 }
 
+// {
+//       id: '1',
+//       name: 'ABC Suppliers Ltd',
+//       contactPerson: 'John Smith',
+//       phone: '+234-801-234-5678',
+//       email: 'john@abcsuppliers.com',
+//       address: '123 Business District, Lagos',
+//       category: 'Electronics',
+//       rating: 4.5,
+//       status: 'active'
+//     }
+
 const VendorsModule: React.FC = () => {
   const { toast } = useToast();
-  const [suppliers, setSuppliers] = useState<Supplier[]>([
-    {
-      id: '1',
-      name: 'ABC Suppliers Ltd',
-      contactPerson: 'John Smith',
-      phone: '+234-801-234-5678',
-      email: 'john@abcsuppliers.com',
-      address: '123 Business District, Lagos',
-      category: 'Electronics',
-      rating: 4.5,
-      status: 'active'
-    }
-  ]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
 
-  const [marketPrices, setMarketPrices] = useState<MarketPriceItem[]>([
-    {
-      id: '1',
-      name: 'Laptop Computer',
-      category: 'Electronics',
-      currentPrice: 450000,
-      previousPrice: 420000,
-      supplier: 'ABC Suppliers Ltd',
-      location: 'Lagos',
-      lastUpdated: '2024-01-15',
-      availability: 'in-stock',
-      unit: 'pcs'
-    }
-  ]);
+  // const [marketPrices, setMarketPrices] = useState<MarketPriceItem[]>([
+  //   {
+  //     id: '1',
+  //     name: 'Laptop Computer',
+  //     category: 'Electronics',
+  //     currentPrice: 450000,
+  //     previousPrice: 420000,
+  //     supplier: 'ABC Suppliers Ltd',
+  //     location: 'Lagos',
+  //     lastUpdated: '2024-01-15',
+  //     availability: 'in-stock',
+  //     unit: 'pcs'
+  //   }
+  // ]);
 
   const [showAddSupplier, setShowAddSupplier] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -76,10 +77,22 @@ const VendorsModule: React.FC = () => {
     address: '',
     category: ''
   });
+  const [refreshItems, setRefreshItems] = useState(false)
+
+  useEffect(() => {
+    (async () => {
+      const response = await fetch(GET_SUPPLIERS_LIST)
+
+      if (response.ok){
+        const { data } = await response.json()
+        setSuppliers(data)
+      }
+    })()
+  }, [refreshItems])
 
   const categories = ['Electronics', 'Raw Materials', 'Furniture', 'Stationery', 'Food & Beverages'];
 
-  const addSupplier = () => {
+  const addSupplier = async () => {
     if (!newSupplier.name || !newSupplier.contactPerson || !newSupplier.phone) {
       toast({
         title: "Error",
@@ -96,11 +109,26 @@ const VendorsModule: React.FC = () => {
       status: 'active'
     };
 
-    setSuppliers([...suppliers, supplier]);
-    setNewSupplier({ name: '', contactPerson: '', phone: '', email: '', address: '', category: '' });
-    setShowAddSupplier(false);
-    
-    toast({ title: "Success", description: "Supplier added successfully." });
+    console.log(supplier)
+
+    try {
+      const response = await fetch(ADD_SUPPLIERS_LIST, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(supplier)
+      })
+  
+      if (response.ok){
+        setRefreshItems(true)
+        setNewSupplier({ name: '', contactPerson: '', phone: '', email: '', address: '', category: '' });
+        setShowAddSupplier(false);
+        toast({ title: "Success", description: "Supplier added successfully." });
+      }
+    } catch (error) {
+      console.log(error)
+    }
   };
 
   const contactAdmin = (item: MarketPriceItem) => {
@@ -155,7 +183,7 @@ const VendorsModule: React.FC = () => {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        {/* <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
               <MapPin className="h-4 w-4 text-orange-500" />
@@ -165,7 +193,7 @@ const VendorsModule: React.FC = () => {
               </div>
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
@@ -186,35 +214,35 @@ const VendorsModule: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {suppliers.map((supplier) => (
-                <div key={supplier.id} className="border rounded p-4 space-y-2">
+              {suppliers?.map((supplier) => (
+                <div key={supplier?.id} className="border rounded p-4 space-y-2">
                   <div className="flex justify-between items-start">
                     <div>
-                      <h4 className="font-medium">{supplier.name}</h4>
-                      <p className="text-sm text-muted-foreground">{supplier.contactPerson}</p>
+                      <h4 className="font-medium">{supplier?.name}</h4>
+                      <p className="text-sm text-muted-foreground">{supplier?.contactPerson}</p>
                     </div>
-                    <Badge className={supplier.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
-                      {supplier.status.toUpperCase()}
+                    <Badge className={supplier?.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}>
+                      {supplier?.status?.toUpperCase()}
                     </Badge>
                   </div>
                   <div className="space-y-1 text-sm">
                     <div className="flex items-center gap-2">
                       <Phone className="h-3 w-3" />
-                      <span>{supplier.phone}</span>
+                      <span>{supplier?.phone}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Mail className="h-3 w-3" />
-                      <span>{supplier.email}</span>
+                      <span>{supplier?.email}</span>
                     </div>
                   </div>
-                  <Badge variant="outline">{supplier.category}</Badge>
+                  <Badge variant="outline">{supplier?.category}</Badge>
                 </div>
               ))}
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        {/* <Card>
           <CardHeader>
             <CardTitle>Market Prices</CardTitle>
           </CardHeader>
@@ -249,7 +277,7 @@ const VendorsModule: React.FC = () => {
               })}
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
 
       <Dialog open={showAddSupplier} onOpenChange={setShowAddSupplier}>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from '@/components/ui/badge';
 import { Plus, Edit, Trash2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ADD_CATEGORY, GET_CATEGORIES_LIST } from '@/shared/constants';
 
 interface Category {
   id: string;
@@ -16,23 +17,36 @@ interface Category {
   description?: string;
   isDefault: boolean;
 }
+// [
+//     { id: '1', name: 'Food', type: 'inventory', description: 'Food items and ingredients', isDefault: true },
+//     { id: '2', name: 'Beverages', type: 'inventory', description: 'Drinks and beverages', isDefault: true },
+//     { id: '3', name: 'Stationery', type: 'inventory', description: 'Office supplies', isDefault: true },
+//     { id: '4', name: 'Equipment', type: 'inventory', description: 'Kitchen and office equipment', isDefault: true },
+//     { id: '5', name: 'Food Vendors', type: 'supplier', description: 'Food and ingredient suppliers', isDefault: true },
+//     { id: '6', name: 'Equipment Suppliers', type: 'supplier', description: 'Equipment and tool suppliers', isDefault: true },
+//   ]
 
 const CategoryManagement: React.FC = () => {
-  const [categories, setCategories] = useState<Category[]>([
-    { id: '1', name: 'Food', type: 'inventory', description: 'Food items and ingredients', isDefault: true },
-    { id: '2', name: 'Beverages', type: 'inventory', description: 'Drinks and beverages', isDefault: true },
-    { id: '3', name: 'Stationery', type: 'inventory', description: 'Office supplies', isDefault: true },
-    { id: '4', name: 'Equipment', type: 'inventory', description: 'Kitchen and office equipment', isDefault: true },
-    { id: '5', name: 'Food Vendors', type: 'supplier', description: 'Food and ingredient suppliers', isDefault: true },
-    { id: '6', name: 'Equipment Suppliers', type: 'supplier', description: 'Equipment and tool suppliers', isDefault: true },
-  ]);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   const [newCategory, setNewCategory] = useState({ name: '', type: 'inventory' as 'inventory' | 'supplier', description: '' });
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [refreshItems, setRefreshItems] = useState(false)
 
-  const handleAddCategory = () => {
+  useEffect(() => {
+    (async () => {
+      const response = await fetch(GET_CATEGORIES_LIST)
+
+      if (response.ok){
+        const { data } = await response.json()
+        setCategories(data)
+      }
+    })()
+  }, [refreshItems])
+
+  const handleAddCategory = async () => {
     if (newCategory.name.trim()) {
       const category: Category = {
         id: Date.now().toString(),
@@ -41,9 +55,20 @@ const CategoryManagement: React.FC = () => {
         description: newCategory.description,
         isDefault: false
       };
-      setCategories([...categories, category]);
-      setNewCategory({ name: '', type: 'inventory', description: '' });
-      setIsAddDialogOpen(false);
+
+      const response = await fetch(ADD_CATEGORY, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(category)
+      })
+  
+      if (response.ok){
+        setRefreshItems(true)
+        setNewCategory({ name: '', type: 'inventory', description: '' });
+        setIsAddDialogOpen(false);
+      }
     }
   };
 

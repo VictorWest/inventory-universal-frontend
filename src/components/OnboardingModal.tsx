@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import IndustrySetup from './IndustrySetup';
 import { getSessionEmail } from '@/lib/session';
-import { updateIndustry } from '@/shared/constants';
+import { UPDATE_INDUSTRY } from '@/shared/constants';
 
 interface OnboardingModalProps {
   isOpen: boolean;
@@ -38,9 +38,7 @@ const OnboardingModal: React.FC<OnboardingModalProps> = ({ isOpen, onIndustrySel
   };
 
   const handleFinishSetup = async () => {
-    const email = getSessionEmail()
-
-    const response = await fetch(updateIndustry(email, selectedIndustry), {
+    const response = await fetch(UPDATE_INDUSTRY(selectedIndustry), {
       method: "POST"
     })
 

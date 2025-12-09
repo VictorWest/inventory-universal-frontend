@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { FileX, Plus, Check, X } from 'lucide-react';
+import { ADD_WRITE_OFF, GET_WRITE_OFF_LIST } from '@/shared/constants';
 
 interface WriteOffRequest {
   id: string;
@@ -24,28 +25,8 @@ interface WriteOffRequest {
 }
 
 const WriteOffRequests: React.FC = () => {
-  const [requests, setRequests] = useState<WriteOffRequest[]>([
-    {
-      id: '1',
-      itemName: 'Paracetamol Tablets',
-      quantity: 50,
-      reason: 'Expired medication',
-      requestedBy: 'John Doe',
-      requestDate: '2024-01-15',
-      status: 'pending'
-    },
-    {
-      id: '2',
-      itemName: 'Coca Cola 50cl',
-      quantity: 20,
-      reason: 'Damaged packaging',
-      requestedBy: 'Jane Smith',
-      requestDate: '2024-01-14',
-      approvedBy: 'Super Admin',
-      approvalDate: '2024-01-16',
-      status: 'approved'
-    }
-  ]);
+  const [requests, setRequests] = useState<WriteOffRequest[]>([]);
+  const [refreshItems, setRefreshItems] = useState(false)
 
   const [isCreating, setIsCreating] = useState(false);
   const [formData, setFormData] = useState({
@@ -66,7 +47,18 @@ const WriteOffRequests: React.FC = () => {
     'Other'
   ];
 
-  const handleCreateRequest = () => {
+  useEffect(() => {
+    (async () => {
+      const response = await fetch(GET_WRITE_OFF_LIST)
+
+      if (response.ok){
+        const { data } = await response.json()
+        setRequests(data)
+      }
+    })()
+  }, [refreshItems])
+
+  const handleCreateRequest = async () => {
     if (!formData.itemName || !formData.quantity || !formData.reason) return;
 
     const newRequest: WriteOffRequest = {
@@ -80,9 +72,19 @@ const WriteOffRequests: React.FC = () => {
       comments: formData.comments
     };
 
-    setRequests([...requests, newRequest]);
-    setIsCreating(false);
-    setFormData({ itemName: '', quantity: '', reason: '', comments: '' });
+    const response = await fetch(ADD_WRITE_OFF, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(newRequest)
+    })
+
+    if (response.ok){
+      setRefreshItems(true)
+      setIsCreating(false);
+      setFormData({ itemName: '', quantity: '', reason: '', comments: '' });
+    }
   };
 
   const handleApproveRequest = (id: string) => {
