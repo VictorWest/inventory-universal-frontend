@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Edit, Trash2 } from 'lucide-react';
+import { ADD_MEASUREMENT, GET_MEASUREMENTS_LIST } from '@/shared/constants';
 
 interface UOM {
   id: string;
@@ -19,41 +20,11 @@ interface UOM {
 }
 
 const UOMConfiguration: React.FC = () => {
-  const [uoms, setUoms] = useState<UOM[]>([
-    {
-      id: '1',
-      name: 'Pieces',
-      abbreviation: 'pcs',
-      category: 'Count',
-      description: 'Individual items'
-    },
-    {
-      id: '2',
-      name: 'Cartons',
-      abbreviation: 'ctn',
-      category: 'Packaging',
-      baseUnit: 'pcs',
-      conversionFactor: 12,
-      description: '1 carton = 12 pieces'
-    },
-    {
-      id: '3',
-      name: 'Kilograms',
-      abbreviation: 'kg',
-      category: 'Weight',
-      description: 'Weight measurement'
-    },
-    {
-      id: '4',
-      name: 'Litres',
-      abbreviation: 'L',
-      category: 'Volume',
-      description: 'Volume measurement'
-    }
-  ]);
+  const [uoms, setUoms] = useState<UOM[]>([]);
 
   const [isCreating, setIsCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [refreshItems, setRefreshItems] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     abbreviation: '',
@@ -65,7 +36,18 @@ const UOMConfiguration: React.FC = () => {
 
   const categories = ['Count', 'Weight', 'Volume', 'Length', 'Area', 'Packaging', 'Time'];
 
-  const handleCreate = () => {
+  useEffect(() => {
+    (async () => {
+      const response = await fetch(GET_MEASUREMENTS_LIST)
+
+      if (response.ok){
+        const { data } = await response.json()
+        setUoms(data)
+      }
+    })()
+  }, [refreshItems])
+
+  const handleCreate = async () => {
     if (!formData.name || !formData.abbreviation || !formData.category) return;
 
     const newUOM: UOM = {
@@ -78,9 +60,19 @@ const UOMConfiguration: React.FC = () => {
       description: formData.description
     };
 
-    setUoms([...uoms, newUOM]);
-    setIsCreating(false);
-    resetForm();
+    const response = await fetch(ADD_MEASUREMENT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(newUOM)
+    })
+
+    if (response.ok){
+      setRefreshItems(true)
+      setIsCreating(false);
+      resetForm();
+    }
   };
 
   const handleEdit = (uom: UOM) => {
@@ -190,12 +182,12 @@ const UOMConfiguration: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="baseUnit">Base Unit (Optional)</Label>
-                  <Select value={formData.baseUnit} onValueChange={(value) => setFormData(prev => ({ ...prev, baseUnit: value }))}>
+                  <Select value={formData.baseUnit} onValueChange={(value) => setFormData(prev => ({ ...prev, baseUnit: value === 'NONE' ? '' : value }))}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select base unit" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value="NONE">None</SelectItem>
                       {baseUnits.map(unit => (
                         <SelectItem key={unit} value={unit}>{unit}</SelectItem>
                       ))}
@@ -320,12 +312,12 @@ const UOMConfiguration: React.FC = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="edit-baseUnit">Base Unit (Optional)</Label>
-                <Select value={formData.baseUnit} onValueChange={(value) => setFormData(prev => ({ ...prev, baseUnit: value }))}>
+                <Select value={formData.baseUnit} onValueChange={(value) => setFormData(prev => ({ ...prev, baseUnit: value === 'NONE' ? '' : value }))}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select base unit" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="NONE">None</SelectItem>
                     {baseUnits.map(unit => (
                       <SelectItem key={unit} value={unit}>{unit}</SelectItem>
                     ))}

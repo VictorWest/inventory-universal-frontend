@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,12 +9,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DollarSign, Eye } from 'lucide-react';
 import PaymentHistory from '@/components/receivables/PaymentHistory';
+import { GET_RECEIVABLES_LIST, ADD_PAYMENT, UPDATE_RECEIVABLE } from '@/shared/constants';
 
 interface PaymentRecord {
   id: string;
   amount: number;
   date: string;
-  method: 'Cash' | 'POS' | 'Transfer';
+  method: 'cash' | 'POS' | 'transfer';
   reference?: string;
   recordedBy: string;
 }
@@ -23,35 +24,36 @@ interface Receivable {
   id: string;
   cashierName: string;
   customerName: string;
-  originalAmount: number;
+  amount: number;
   creationDate: string;
   status: 'Unsettled' | 'Partially Paid' | 'Fully Paid';
+  remainingBalance: number
   paymentHistory: PaymentRecord[];
 }
 
+// {
+//       id: '1',
+//       cashierName: 'John Doe',
+//       customerName: 'ABC Company',
+//       amount: 15000,
+//       creationDate: '2024-01-15',
+//       status: 'Partially Paid',
+//       paymentHistory: [
+//         { id: '1', amount: 5000, date: '2024-01-20', method: 'Cash', recordedBy: 'Super Admin' }
+//       ]
+//     },
+//     {
+//       id: '2',
+//       cashierName: 'Jane Smith',
+//       customerName: 'XYZ Corp',
+//       amount: 25000,
+//       creationDate: '2024-01-16',
+//       status: 'Unsettled',
+//       paymentHistory: []
+//     }
+
 const ReceivablesModule: React.FC = () => {
-  const [receivables, setReceivables] = useState<Receivable[]>([
-    {
-      id: '1',
-      cashierName: 'John Doe',
-      customerName: 'ABC Company',
-      originalAmount: 15000,
-      creationDate: '2024-01-15',
-      status: 'Partially Paid',
-      paymentHistory: [
-        { id: '1', amount: 5000, date: '2024-01-20', method: 'Cash', recordedBy: 'Super Admin' }
-      ]
-    },
-    {
-      id: '2',
-      cashierName: 'Jane Smith',
-      customerName: 'XYZ Corp',
-      originalAmount: 25000,
-      creationDate: '2024-01-16',
-      status: 'Unsettled',
-      paymentHistory: []
-    }
-  ]);
+  const [receivables, setReceivables] = useState<Receivable[]>([]);
 
   const [selectedReceivable, setSelectedReceivable] = useState<Receivable | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -59,50 +61,102 @@ const ReceivablesModule: React.FC = () => {
   const [paymentReference, setPaymentReference] = useState('');
   const [isSettling, setIsSettling] = useState(false);
   const [viewingHistory, setViewingHistory] = useState<Receivable | null>(null);
+  const [refreshItems, setRefreshItems] = useState(false)
 
-  const getTotalPaid = (receivable: Receivable) => {
-    return receivable.paymentHistory.reduce((sum, payment) => sum + payment.amount, 0);
-  };
+  useEffect(() => {
+    (async () => {
+      const response = await fetch(GET_RECEIVABLES_LIST)
 
-  const getRemainingBalance = (receivable: Receivable) => {
-    return receivable.originalAmount - getTotalPaid(receivable);
-  };
+      if (response.ok){
+        const { data } = await response.json()
+        setReceivables(data)
+        console.log(data)
+      }
+    })()
+  }, [refreshItems])
 
-  const handleRecordPayment = () => {
+  // const getTotalPaid = (receivable: Receivable) => {
+  //   return receivable.paymentHistory.reduce((sum, payment) => sum + payment.amount, 0);
+  // };
+
+  // const getRemainingBalance = (receivable: Receivable) => {
+  //   return receivable.amount - getTotalPaid(receivable);
+  // };
+
+  const handleRecordPayment = async () => {
     if (!selectedReceivable || !paymentAmount || !paymentMethod) return;
 
     const amount = parseFloat(paymentAmount);
-    const newPayment: PaymentRecord = {
-      id: Date.now().toString(),
+
+    const payment = {
+      customerName: selectedReceivable.customerName,
+      cashierName: selectedReceivable.cashierName,
+      receivableId: selectedReceivable.id,
       amount,
-      date: new Date().toISOString().split('T')[0],
-      method: paymentMethod as 'Cash' | 'POS' | 'Transfer',
-      reference: paymentReference || undefined,
-      recordedBy: 'Super Admin'
-    };
+      paymentMethod: paymentMethod,
+      reference: paymentReference || undefined
+    }
 
-    const updatedReceivables = receivables.map(r => {
-      if (r.id === selectedReceivable.id) {
-        const updatedPaymentHistory = [...r.paymentHistory, newPayment];
-        const totalPaid = updatedPaymentHistory.reduce((sum, p) => sum + p.amount, 0);
-        const newStatus = totalPaid >= r.originalAmount ? 'Fully Paid' : 
-                         totalPaid > 0 ? 'Partially Paid' : 'Unsettled';
-        
-        return {
-          ...r,
-          paymentHistory: updatedPaymentHistory,
-          status: newStatus as 'Unsettled' | 'Partially Paid' | 'Fully Paid'
-        };
+    try {
+      const resp = await fetch(ADD_PAYMENT, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payment)
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text();
+        console.error('Payment failed', text);
+        alert('Failed to record payment');
+        return;
       }
-      return r;
-    });
 
-    setReceivables(updatedReceivables);
-    setIsSettling(false);
-    setPaymentAmount('');
-    setPaymentMethod('');
-    setPaymentReference('');
-    setSelectedReceivable(null);
+      // Refresh receivables from backend
+
+      const updatedReceivablePayment = {
+          customerName: selectedReceivable.customerName,
+          cashierName: selectedReceivable.cashierName,
+          amount,
+          date: new Date(),
+          note: `Payment of ${amount} made in service to ${selectedReceivable.customerName}, administered by ${selectedReceivable.cashierName}`
+      }
+
+      const response2 = await fetch(UPDATE_RECEIVABLE, {
+        method: "PATCH",
+        headers: {
+          'Content-Type': 'application/json'
+        }, 
+        body: JSON.stringify(updatedReceivablePayment)
+      })
+
+      if (!response2.ok){
+        const text = await resp.text();
+        console.error('Receivable update failed', text);
+        alert('Failed to update receivable');
+        return;
+      }
+
+      const listResp = await fetch(GET_RECEIVABLES_LIST, { credentials: 'include' });
+      if (listResp.ok) {
+        const { data } = await listResp.json();
+        setReceivables(data);
+      } else {
+        // fallback: trigger refresh
+        setRefreshItems(prev => !prev);
+      }
+
+      setIsSettling(false);
+      setPaymentAmount('');
+      setPaymentMethod('');
+      setPaymentReference('');
+      setSelectedReceivable(null);
+    } catch (err) {
+      console.error(err);
+      alert('Error recording payment');
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -131,7 +185,7 @@ const ReceivablesModule: React.FC = () => {
           <CardDescription>All customer debts with cashier/waitstaff information</CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
+          <Table className="table-auto">
             <TableHeader>
               <TableRow>
                 <TableHead>Cashier/Waitstaff</TableHead>
@@ -144,16 +198,17 @@ const ReceivablesModule: React.FC = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {receivables.map((receivable) => (
+              {receivables?.map((receivable) => (
                 <React.Fragment key={receivable.id}>
                   <TableRow>
                     <TableCell className="font-medium">{receivable.cashierName}</TableCell>
                     <TableCell>{receivable.customerName}</TableCell>
-                    <TableCell>₦{receivable.originalAmount.toLocaleString()}</TableCell>
+                    <TableCell className="font-semibold">₦{receivable.amount?.toLocaleString()}</TableCell>
                     <TableCell>{receivable.creationDate}</TableCell>
                     <TableCell>{getStatusBadge(receivable.status)}</TableCell>
                     <TableCell className="font-semibold">
-                      ₦{getRemainingBalance(receivable).toLocaleString()}
+                      {/* ₦{getRemainingBalance(receivable)?.toLocaleString()} */}
+                      ₦{receivable.remainingBalance?.toLocaleString()}
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
@@ -180,11 +235,11 @@ const ReceivablesModule: React.FC = () => {
                   </TableRow>
                   {viewingHistory?.id === receivable.id && (
                     <TableRow>
-                      <TableCell colSpan={7} className="p-0">
+                      <TableCell colSpan={7} className="p-4">
                         <PaymentHistory 
                           payments={receivable.paymentHistory}
-                          totalAmount={receivable.originalAmount}
-                          remainingBalance={getRemainingBalance(receivable)}
+                          totalAmount={receivable.amount}
+                          remainingBalance={receivable.remainingBalance}
                         />
                       </TableCell>
                     </TableRow>
@@ -206,7 +261,7 @@ const ReceivablesModule: React.FC = () => {
             <div>
               <Label>Customer: {selectedReceivable?.customerName}</Label>
               <p className="text-sm text-gray-600">
-                Outstanding Balance: ₦{selectedReceivable ? getRemainingBalance(selectedReceivable).toLocaleString() : 0}
+                Outstanding Balance: ₦{selectedReceivable ? selectedReceivable.remainingBalance?.toLocaleString() : 0}
               </p>
             </div>
             <div>
@@ -226,9 +281,9 @@ const ReceivablesModule: React.FC = () => {
                   <SelectValue placeholder="Select payment method" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Cash">Cash</SelectItem>
+                  <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="POS">POS</SelectItem>
-                  <SelectItem value="Transfer">Transfer</SelectItem>
+                  <SelectItem value="transfer">Transfer</SelectItem>
                 </SelectContent>
               </Select>
             </div>

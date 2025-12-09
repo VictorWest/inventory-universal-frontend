@@ -41,7 +41,7 @@ const SettlementHistory: React.FC<SettlementHistoryProps> = ({ settlements, tota
     }
   };
 
-  const totalPaid = settlements.reduce((sum, settlement) => sum + settlement.amount, 0);
+  const totalPaid = (settlements || []).reduce((sum, settlement) => sum + Number(settlement.amount || 0), 0);
 
   return (
     <Card className="mt-4">
@@ -51,13 +51,13 @@ const SettlementHistory: React.FC<SettlementHistoryProps> = ({ settlements, tota
           <span>Settlement History</span>
         </CardTitle>
         <div className="flex justify-between text-sm">
-          <span>Total Owed: <strong>₦{totalAmount.toLocaleString()}</strong></span>
-          <span>Total Paid: <strong className="text-green-600">₦{totalPaid.toLocaleString()}</strong></span>
-          <span>Outstanding: <strong className="text-red-600">₦{remainingBalance.toLocaleString()}</strong></span>
+          <span>Total Owed: <strong>₦{totalAmount?.toLocaleString()}</strong></span>
+          <span>Total Paid: <strong className="text-green-600">₦{totalPaid?.toLocaleString()}</strong></span>
+          <span>Outstanding: <strong className="text-red-600">₦{remainingBalance?.toLocaleString()}</strong></span>
         </div>
       </CardHeader>
       <CardContent>
-        {settlements.length === 0 ? (
+        {settlements?.length === 0 ? (
           <p className="text-gray-500 text-center py-4">No settlements recorded yet</p>
         ) : (
           <Table>
@@ -72,7 +72,7 @@ const SettlementHistory: React.FC<SettlementHistoryProps> = ({ settlements, tota
               </TableRow>
             </TableHeader>
             <TableBody>
-              {settlements.map((settlement) => (
+              {settlements?.map((settlement) => (
                 <TableRow key={settlement.id}>
                   <TableCell>{settlement.date}</TableCell>
                   <TableCell className="font-semibold text-green-600">

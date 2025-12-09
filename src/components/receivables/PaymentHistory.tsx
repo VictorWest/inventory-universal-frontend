@@ -8,7 +8,7 @@ interface PaymentRecord {
   id: string;
   amount: number;
   date: string;
-  method: 'Cash' | 'POS' | 'Transfer';
+  method: 'cash' | 'POS' | 'transfer';
   reference?: string;
   recordedBy: string;
 }
@@ -22,23 +22,23 @@ interface PaymentHistoryProps {
 const PaymentHistory: React.FC<PaymentHistoryProps> = ({ payments, totalAmount, remainingBalance }) => {
   const getPaymentIcon = (method: string) => {
     switch (method) {
-      case 'Cash': return <Banknote className="h-4 w-4" />;
+      case 'cash': return <Banknote className="h-4 w-4" />;
       case 'POS': return <CreditCard className="h-4 w-4" />;
-      case 'Transfer': return <Smartphone className="h-4 w-4" />;
+      case 'transfer': return <Smartphone className="h-4 w-4" />;
       default: return <CreditCard className="h-4 w-4" />;
     }
   };
 
   const getMethodColor = (method: string) => {
     switch (method) {
-      case 'Cash': return 'bg-green-100 text-green-800';
+      case 'cash': return 'bg-green-100 text-green-800';
       case 'POS': return 'bg-blue-100 text-blue-800';
-      case 'Transfer': return 'bg-purple-100 text-purple-800';
+      case 'transfer': return 'bg-purple-100 text-purple-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const totalPaid = payments.reduce((sum, payment) => sum + payment.amount, 0);
+  const totalPaid = payments?.reduce((sum, payment) => sum + payment.amount, 0);
 
   return (
     <Card className="mt-4">
@@ -47,14 +47,14 @@ const PaymentHistory: React.FC<PaymentHistoryProps> = ({ payments, totalAmount, 
           <Calendar className="h-5 w-5" />
           <span>Payment History</span>
         </CardTitle>
-        <div className="flex justify-between text-sm">
-          <span>Original Amount: <strong>₦{totalAmount.toLocaleString()}</strong></span>
-          <span>Total Paid: <strong className="text-green-600">₦{totalPaid.toLocaleString()}</strong></span>
-          <span>Remaining: <strong className="text-red-600">₦{remainingBalance.toLocaleString()}</strong></span>
+        <div className="flex justify-between text-sm flex-wrap gap-2">
+          <span>Original Amount: <strong>₦{totalAmount?.toLocaleString()}</strong></span>
+          <span>Total Paid: <strong className="text-green-600">₦{totalPaid?.toLocaleString()}</strong></span>
+          <span>Remaining: <strong className="text-red-600">₦{remainingBalance?.toLocaleString()}</strong></span>
         </div>
       </CardHeader>
       <CardContent>
-        {payments.length === 0 ? (
+        {payments?.length === 0 ? (
           <p className="text-gray-500 text-center py-4">No payments recorded yet</p>
         ) : (
           <Table>
@@ -68,11 +68,11 @@ const PaymentHistory: React.FC<PaymentHistoryProps> = ({ payments, totalAmount, 
               </TableRow>
             </TableHeader>
             <TableBody>
-              {payments.map((payment) => (
+              {payments?.map((payment) => (
                 <TableRow key={payment.id}>
                   <TableCell>{payment.date}</TableCell>
                   <TableCell className="font-semibold text-green-600">
-                    ₦{payment.amount.toLocaleString()}
+                    ₦{payment.amount?.toLocaleString()}
                   </TableCell>
                   <TableCell>
                     <Badge className={getMethodColor(payment.method)}>

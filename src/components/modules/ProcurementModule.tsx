@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Eye, Edit, Check, X, History } from 'lucide-react';
+import { Eye, Edit, Check, X, History, Plus } from 'lucide-react';
+import { GET_PROCUREMENTS_LIST, ADD_PROCUREMENT } from '@/shared/constants';
 
 interface ProcurementRequest {
   id: string;
@@ -28,18 +29,15 @@ interface ProcurementRequest {
 }
 
 const ProcurementModule: React.FC = () => {
-  const [requests, setRequests] = useState<ProcurementRequest[]>([
-    {
-      id: 'PR001',
-      department: 'Kitchen',
-      items: [
-        { name: 'Rice 50kg', requestedQty: 10, estimatedCost: 50000 },
-        { name: 'Cooking Oil 25L', requestedQty: 5, estimatedCost: 25000 }
-      ],
-      status: 'Pending',
-      requestDate: '2024-01-15'
-    }
-  ]);
+  const [requests, setRequests] = useState<ProcurementRequest[]>([]);
+  const [refreshItems, setRefreshItems] = useState(false);
+
+  // Add dialog state
+  const [isAddingRequest, setIsAddingRequest] = useState(false);
+  const [newDepartment, setNewDepartment] = useState('');
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemQty, setNewItemQty] = useState('');
+  const [newEstimatedCost, setNewEstimatedCost] = useState('');
 
   const [selectedRequest, setSelectedRequest] = useState<ProcurementRequest | null>(null);
   const [editingRequest, setEditingRequest] = useState<ProcurementRequest | null>(null);
@@ -60,6 +58,80 @@ const ProcurementModule: React.FC = () => {
     ));
   };
 
+  // Fetch procurements from backend and normalize numeric fields
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const resp = await fetch(GET_PROCUREMENTS_LIST, { credentials: 'include' });
+        if (!resp.ok) return;
+        const { data } = await resp.json();
+        const normalized = (data || []).map((r: any) => {
+          const items = (r.items || []).map((it: any) => ({
+            ...it,
+            requestedQty: Number(it.requestedQty) || 0,
+            approvedQty: it.approvedQty == null ? undefined : Number(it.approvedQty),
+            estimatedCost: Number(it.estimatedCost) || 0,
+            adjustedCost: it.adjustedCost == null ? undefined : Number(it.adjustedCost)
+          }));
+
+          return {
+            ...r,
+            items,
+            requestDate: r.requestDate || (new Date().toISOString().split('T')[0]),
+            status: r.status || 'Pending'
+          } as ProcurementRequest;
+        });
+
+        setRequests(normalized);
+      } catch (err) {
+        console.error('Failed to fetch procurements', err);
+      }
+    })();
+  }, [refreshItems]);
+
+  const handleAddRequest = async () => {
+    if (!newDepartment || !newItemName || !newItemQty || !newEstimatedCost) return;
+
+    try {
+      const body = {
+        department: newDepartment,
+        items: [
+          {
+            name: newItemName,
+            requestedQty: Number(newItemQty),
+            estimatedCost: Number(newEstimatedCost)
+          }
+        ],
+        requestDate: new Date().toISOString().split('T')[0]
+      };
+
+      const resp = await fetch(ADD_PROCUREMENT, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text();
+        console.error('Add procurement failed', text);
+        alert('Failed to add procurement');
+        return;
+      }
+
+      // refresh list
+      setRefreshItems(prev => !prev);
+      setIsAddingRequest(false);
+      setNewDepartment('');
+      setNewItemName('');
+      setNewItemQty('');
+      setNewEstimatedCost('');
+    } catch (err) {
+      console.error(err);
+      alert('Error adding procurement');
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Pending': return 'bg-yellow-100 text-yellow-800';
@@ -75,6 +147,40 @@ const ProcurementModule: React.FC = () => {
         <div>
           <h2 className="text-2xl font-bold">Procurement Management</h2>
           <p className="text-gray-600">Review and approve procurement requests</p>
+        </div>
+        <div>
+          <Dialog open={isAddingRequest} onOpenChange={setIsAddingRequest}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Request
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create Procurement Request</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="dept">Department</Label>
+                  <Input id="dept" value={newDepartment} onChange={(e) => setNewDepartment(e.target.value)} />
+                </div>
+                <div>
+                  <Label htmlFor="item">Item Name</Label>
+                  <Input id="item" value={newItemName} onChange={(e) => setNewItemName(e.target.value)} />
+                </div>
+                <div>
+                  <Label htmlFor="qty">Quantity</Label>
+                  <Input id="qty" type="number" value={newItemQty} onChange={(e) => setNewItemQty(e.target.value)} />
+                </div>
+                <div>
+                  <Label htmlFor="cost">Estimated Cost</Label>
+                  <Input id="cost" type="number" value={newEstimatedCost} onChange={(e) => setNewEstimatedCost(e.target.value)} />
+                </div>
+                <Button className="w-full" onClick={handleAddRequest}>Create Request</Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 

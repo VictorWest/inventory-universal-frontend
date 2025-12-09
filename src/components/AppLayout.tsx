@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getSessionEmail } from '@/lib/session';
 import OnboardingModal from './OnboardingModal';
 import DashboardHeader from './DashboardHeader';
 import Sidebar from './Sidebar';
@@ -18,7 +19,16 @@ import { Button } from '@/components/ui/button';
 import { Settings, Crown } from 'lucide-react';
 
 const AppLayout: React.FC = () => {
-  const [showOnboarding, setShowOnboarding] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    try {
+      const email = getSessionEmail();
+      if (!email) return true;
+      const completed = localStorage.getItem(`ONBOARDING_COMPLETED_${email}`);
+      return completed !== '1';
+    } catch (e) {
+      return true;
+    }
+  });
   const [selectedIndustry, setSelectedIndustry] = useState('');
   const [activeModule, setActiveModule] = useState('inventory');
   const [companyName, setCompanyName] = useState('Mi-Inventory Pro');
@@ -26,6 +36,12 @@ const AppLayout: React.FC = () => {
   const handleIndustrySelect = (industry: string) => {
     setSelectedIndustry(industry);
     setShowOnboarding(false);
+    try {
+      const email = getSessionEmail();
+      if (email) localStorage.setItem(`ONBOARDING_COMPLETED_${email}`, '1');
+    } catch (e) {
+      // ignore localStorage errors
+    }
     setCompanyName(`${industry.charAt(0).toUpperCase() + industry.slice(1)} Company`);
   };
 
