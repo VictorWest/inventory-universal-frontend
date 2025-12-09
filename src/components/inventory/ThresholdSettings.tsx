@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,56 +7,49 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, Settings } from 'lucide-react';
+import { ADD_THRESHOLD, deleteThresholdsList, GET_THRESHOLDS_LIST } from '@/shared/constants';
 
 interface ThresholdSetting {
   id: string;
   itemName: string;
   currentStock: number;
   reorderLevel: number;
-  minStockLevel: number;
-  maxStockLevel: number;
+  minStock: number;
+  maxStock: number;
   autoAlerts: boolean;
   status: 'normal' | 'low' | 'critical';
 }
 
 const ThresholdSettings: React.FC = () => {
-  const [thresholds, setThresholds] = useState<ThresholdSetting[]>([
-    {
-      id: '1',
-      itemName: 'Paracetamol Tablets',
-      currentStock: 50,
-      reorderLevel: 100,
-      minStockLevel: 20,
-      maxStockLevel: 500,
-      autoAlerts: true,
-      status: 'critical'
-    },
-    {
-      id: '2',
-      itemName: 'Coca Cola 50cl',
-      currentStock: 150,
-      reorderLevel: 100,
-      minStockLevel: 50,
-      maxStockLevel: 300,
-      autoAlerts: true,
-      status: 'normal'
-    }
-  ]);
+  const [thresholds, setThresholds] = useState<ThresholdSetting[]>([]);
+  const [refreshItems, setRefreshItems] = useState(false)
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
     reorderLevel: '',
-    minStockLevel: '',
-    maxStockLevel: '',
+    minStock: '',
+    maxStock: '',
     autoAlerts: false
   });
+
+  useEffect(() => {
+    (async () => {
+      const response = await fetch(GET_THRESHOLDS_LIST)
+
+      if (response.ok){
+        const { data } = await response.json()
+        setThresholds(data)
+      }
+    })()
+  }, [refreshItems])
+  
 
   const handleEdit = (threshold: ThresholdSetting) => {
     setEditingId(threshold.id);
     setEditForm({
       reorderLevel: threshold.reorderLevel.toString(),
-      minStockLevel: threshold.minStockLevel.toString(),
-      maxStockLevel: threshold.maxStockLevel.toString(),
+      minStock: threshold.minStock.toString(),
+      maxStock: threshold.maxStock.toString(),
       autoAlerts: threshold.autoAlerts
     });
   };
@@ -69,13 +62,13 @@ const ThresholdSettings: React.FC = () => {
         const updated = {
           ...t,
           reorderLevel: parseInt(editForm.reorderLevel),
-          minStockLevel: parseInt(editForm.minStockLevel),
-          maxStockLevel: parseInt(editForm.maxStockLevel),
+          minStock: parseInt(editForm.minStock),
+          maxStock: parseInt(editForm.maxStock),
           autoAlerts: editForm.autoAlerts
         };
         
         // Update status based on current stock
-        if (updated.currentStock <= updated.minStockLevel) {
+        if (updated.currentStock <= updated.minStock) {
           updated.status = 'critical';
         } else if (updated.currentStock <= updated.reorderLevel) {
           updated.status = 'low';
@@ -92,9 +85,28 @@ const ThresholdSettings: React.FC = () => {
     setEditingId(null);
   };
 
+  useEffect(() => {
+    (async () => {
+      thresholds.forEach(async (item, index) => {
+        const response = await fetch(deleteThresholdsList(index), {
+          method: "DELETE"
+        })
+      })
+
+      const response = await fetch (ADD_THRESHOLD, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(thresholds)
+      })
+      
+    })()
+  }, [thresholds])
+
   const handleCancel = () => {
     setEditingId(null);
-    setEditForm({ reorderLevel: '', minStockLevel: '', maxStockLevel: '', autoAlerts: false });
+    setEditForm({ reorderLevel: '', minStock: '', maxStock: '', autoAlerts: false });
   };
 
   const getStatusBadge = (status: string) => {
@@ -189,24 +201,24 @@ const ThresholdSettings: React.FC = () => {
                     {editingId === threshold.id ? (
                       <Input
                         type="number"
-                        value={editForm.minStockLevel}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, minStockLevel: e.target.value }))}
+                        value={editForm.minStock}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, minStock: e.target.value }))}
                         className="w-20"
                       />
                     ) : (
-                      threshold.minStockLevel
+                      threshold.minStock
                     )}
                   </TableCell>
                   <TableCell>
                     {editingId === threshold.id ? (
                       <Input
                         type="number"
-                        value={editForm.maxStockLevel}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, maxStockLevel: e.target.value }))}
+                        value={editForm.maxStock}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, maxStock: e.target.value }))}
                         className="w-20"
                       />
                     ) : (
-                      threshold.maxStockLevel
+                      threshold.maxStock
                     )}
                   </TableCell>
                   <TableCell>

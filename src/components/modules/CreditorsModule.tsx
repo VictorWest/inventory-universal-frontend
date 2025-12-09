@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,8 +7,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { DollarSign, Eye } from 'lucide-react';
+import { Plus, DollarSign, Eye } from 'lucide-react';
 import SettlementHistory from '@/components/creditors/SettlementHistory';
+import { GET_CREDITORS_LIST, ADD_CREDITOR, UPDATE_CREDITOR } from '@/shared/constants';
 
 interface SettlementRecord {
   id: string;
@@ -24,32 +25,14 @@ interface Creditor {
   id: string;
   supplierName: string;
   originalAmount: number;
+  remainingBalance: number;
   creationDate: string;
   status: 'Unpaid' | 'Partially Paid' | 'Fully Paid';
   settlementHistory: SettlementRecord[];
 }
 
 const CreditorsModule: React.FC = () => {
-  const [creditors, setCreditors] = useState<Creditor[]>([
-    {
-      id: '1',
-      supplierName: 'ABC Food Supplies',
-      originalAmount: 50000,
-      creationDate: '2024-01-10',
-      status: 'Partially Paid',
-      settlementHistory: [
-        { id: '1', amount: 20000, date: '2024-01-15', method: 'Transfer', reference: 'TXN123456', recordedBy: 'Procurement Officer' }
-      ]
-    },
-    {
-      id: '2',
-      supplierName: 'XYZ Equipment Ltd',
-      originalAmount: 75000,
-      creationDate: '2024-01-12',
-      status: 'Unpaid',
-      settlementHistory: []
-    }
-  ]);
+  const [creditors, setCreditors] = useState<Creditor[]>([]);
 
   const [selectedCreditor, setSelectedCreditor] = useState<Creditor | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -58,52 +41,143 @@ const CreditorsModule: React.FC = () => {
   const [paymentNotes, setPaymentNotes] = useState('');
   const [isSettling, setIsSettling] = useState(false);
   const [viewingHistory, setViewingHistory] = useState<Creditor | null>(null);
+  const [refreshItems, setRefreshItems] = useState(false)
+  const [isAddingCreditor, setIsAddingCreditor] = useState(false);
+  const [newCreditorName, setNewCreditorName] = useState('');
+  const [newCreditorAmount, setNewCreditorAmount] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      const response = await fetch(GET_CREDITORS_LIST)
+
+      if (response.ok){
+        const { data } = await response.json()
+        // Normalize numeric fields coming from backend (sometimes sent as strings)
+        const normalized = (data || []).map((c: any) => {
+          const settlements = (c.settlementHistory || []).map((s: any) => ({
+            ...s,
+            amount: Number(s.amount) || 0
+          }));
+
+          const originalAmount = Number(c.originalAmount) || 0;
+          const totalPaid = settlements.reduce((sum: number, s: any) => sum + Number(s.amount || 0), 0);
+          const remainingBalance = Number(c.remainingBalance) || Math.max(0, originalAmount - totalPaid);
+
+          return {
+            ...c,
+            originalAmount,
+            remainingBalance,
+            settlementHistory: settlements,
+            // keep status in sync if backend didn't
+            status: remainingBalance === 0 ? 'Fully Paid' : (totalPaid > 0 ? 'Partially Paid' : 'Unpaid')
+          } as Creditor;
+        });
+
+        setCreditors(normalized)
+      }
+    })()
+  }, [refreshItems])
 
   const getTotalPaid = (creditor: Creditor) => {
-    return creditor.settlementHistory.reduce((sum, settlement) => sum + settlement.amount, 0);
+    const arr = creditor.settlementHistory || [];
+    return arr.reduce((sum, settlement) => sum + Number(settlement.amount || 0), 0);
   };
 
   const getRemainingBalance = (creditor: Creditor) => {
     return creditor.originalAmount - getTotalPaid(creditor);
   };
 
-  const handleRecordPayment = () => {
+  const handleRecordPayment = async () => {
     if (!selectedCreditor || !paymentAmount || !paymentMethod) return;
 
     const amount = parseFloat(paymentAmount);
-    const newSettlement: SettlementRecord = {
-      id: Date.now().toString(),
-      amount,
-      date: new Date().toISOString().split('T')[0],
-      method: paymentMethod as 'Cash' | 'POS' | 'Transfer' | 'Cheque',
-      reference: paymentReference || undefined,
-      recordedBy: 'Procurement Officer',
-      notes: paymentNotes || undefined
-    };
 
-    const updatedCreditors = creditors.map(c => {
-      if (c.id === selectedCreditor.id) {
-        const updatedSettlementHistory = [...c.settlementHistory, newSettlement];
-        const totalPaid = updatedSettlementHistory.reduce((sum, s) => sum + s.amount, 0);
-        const newStatus = totalPaid >= c.originalAmount ? 'Fully Paid' : 
-                         totalPaid > 0 ? 'Partially Paid' : 'Unpaid';
-        
-        return {
-          ...c,
-          settlementHistory: updatedSettlementHistory,
-          status: newStatus as 'Unpaid' | 'Partially Paid' | 'Fully Paid'
-        };
+    const payment = {
+          originalBalance: selectedCreditor.originalAmount,
+          remainingBalance: selectedCreditor.remainingBalance - amount,
+          method: paymentMethod,
+          reference: paymentReference || undefined,
+          notes: paymentNotes || undefined
+        }
+    try {
+      // POST settlement to backend
+      const resp = await fetch(UPDATE_CREDITOR(selectedCreditor.supplierName), {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payment)
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text();
+        console.error('Settlement failed', text);
+        alert('Failed to record settlement');
+        return;
       }
-      return c;
-    });
 
-    setCreditors(updatedCreditors);
-    setIsSettling(false);
-    setPaymentAmount('');
-    setPaymentMethod('');
-    setPaymentReference('');
-    setPaymentNotes('');
-    setSelectedCreditor(null);
+      // Refresh creditors from backend
+      const listResp = await fetch(GET_CREDITORS_LIST, { credentials: 'include' });
+      if (listResp.ok) {
+        const { data } = await listResp.json();
+        setCreditors(data);
+      } else {
+        setRefreshItems(prev => !prev);
+      }
+
+      setIsSettling(false);
+      setPaymentAmount('');
+      setPaymentMethod('');
+      setPaymentReference('');
+      setPaymentNotes('');
+      setSelectedCreditor(null);
+    } catch (err) {
+      console.error(err);
+      alert('Error recording settlement');
+    }
+  };
+
+  const handleAddCreditor = async () => {
+    if (!newCreditorName || !newCreditorAmount) return;
+
+    try {
+      const resp = await fetch(ADD_CREDITOR, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          supplierName: newCreditorName,
+          originalAmount: parseFloat(newCreditorAmount),
+          creationDate: new Date().toISOString().split('T')[0]
+        })
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text();
+        console.error('Add creditor failed', text);
+        alert('Failed to add creditor');
+        return;
+      }
+
+      // Refresh creditors from backend
+      const listResp = await fetch(GET_CREDITORS_LIST, { credentials: 'include' });
+      if (listResp.ok) {
+        const { data } = await listResp.json();
+        setCreditors(data);
+      } else {
+        setRefreshItems(prev => !prev);
+      }
+
+      setIsAddingCreditor(false);
+      setNewCreditorName('');
+      setNewCreditorAmount('');
+    } catch (err) {
+      console.error(err);
+      alert('Error adding creditor');
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -124,6 +198,43 @@ const CreditorsModule: React.FC = () => {
           <h2 className="text-2xl font-bold">Creditors Management</h2>
           <p className="text-gray-600">Track and manage outstanding balances owed to suppliers</p>
         </div>
+        <Dialog open={isAddingCreditor} onOpenChange={setIsAddingCreditor}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Creditor
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add New Creditor</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="creditor-name">Supplier/Vendor Name</Label>
+                <Input
+                  id="creditor-name"
+                  placeholder="Enter supplier name"
+                  value={newCreditorName}
+                  onChange={(e) => setNewCreditorName(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="creditor-amount">Amount Owed</Label>
+                <Input
+                  id="creditor-amount"
+                  type="number"
+                  placeholder="Enter amount"
+                  value={newCreditorAmount}
+                  onChange={(e) => setNewCreditorAmount(e.target.value)}
+                />
+              </div>
+              <Button onClick={handleAddCreditor} className="w-full">
+                Add Creditor
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Card>
@@ -144,7 +255,7 @@ const CreditorsModule: React.FC = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {creditors.map((creditor) => (
+              {creditors?.map((creditor) => (
                 <React.Fragment key={creditor.id}>
                   <TableRow>
                     <TableCell className="font-medium">{creditor.supplierName}</TableCell>
@@ -152,7 +263,7 @@ const CreditorsModule: React.FC = () => {
                     <TableCell>{creditor.creationDate}</TableCell>
                     <TableCell>{getStatusBadge(creditor.status)}</TableCell>
                     <TableCell className="font-semibold">
-                      ₦{getRemainingBalance(creditor).toLocaleString()}
+                      ₦{creditor.remainingBalance?.toLocaleString() || 0}
                     </TableCell>
                     <TableCell>
                       <div className="flex space-x-2">
@@ -177,7 +288,7 @@ const CreditorsModule: React.FC = () => {
                       </div>
                     </TableCell>
                   </TableRow>
-                  {viewingHistory?.id === creditor.id && (
+                  {/* {viewingHistory?.id === creditor.id && (
                     <TableRow>
                       <TableCell colSpan={6} className="p-0">
                         <SettlementHistory 
@@ -187,7 +298,7 @@ const CreditorsModule: React.FC = () => {
                         />
                       </TableCell>
                     </TableRow>
-                  )}
+                  )} */}
                 </React.Fragment>
               ))}
             </TableBody>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,7 @@ import ViewRequisitions from '@/components/department/ViewRequisitions';
 import ProcurementList from '@/components/department/ProcurementList';
 import ReturnForms from '@/components/department/ReturnForms';
 import PointOfSales from '@/components/department/PointOfSales';
+import { ADD_DEPARTMENT, GET_DEPARTMENTS_LIST, GET_INVOICE_LIST } from '@/shared/constants';
 
 interface Department {
   id: string;
@@ -34,32 +35,7 @@ interface Department {
 const DepartmentsModule: React.FC = () => {
   const industryFeatures = useIndustryFeatures();
   const { toast } = useToast();
-  const [departments, setDepartments] = useState<Department[]>([
-    {
-      id: '1',
-      name: 'Main Store',
-      location: 'Ground Floor',
-      headId: 'user1',
-      headName: 'John Doe',
-      type: 'store',
-      isCustomerFacing: false,
-      linkedStores: [],
-      itemCount: 150,
-      lastActivity: '2024-01-15'
-    },
-    {
-      id: '2',
-      name: industryFeatures.departments[1] || 'Sales Department',
-      location: 'First Floor',
-      headId: 'user2',
-      headName: 'Jane Smith',
-      type: 'sales',
-      isCustomerFacing: true,
-      linkedStores: ['1'],
-      itemCount: 45,
-      lastActivity: '2024-01-15'
-    }
-  ]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   
   const [selectedDept, setSelectedDept] = useState<Department | null>(null);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -72,6 +48,25 @@ const DepartmentsModule: React.FC = () => {
   const [showReturnOutward, setShowReturnOutward] = useState(false);
   const [showPOS, setShowPOS] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [refreshItems, setRefreshItems] = useState(false)
+  const [inventory, setInventory] = useState([])
+
+  useEffect(() => {
+    (async () => {
+      const response = await fetch(GET_DEPARTMENTS_LIST)
+
+      if (response.ok){
+        const { data } = await response.json()
+        setDepartments(data)
+      }
+
+      const response2 = await fetch(GET_INVOICE_LIST)
+      if (response2.ok){
+        const { data } = await response.json()
+        setInventory(data)
+      }
+    })()
+  }, [refreshItems])
 
   const mockUsers = [
     { id: 'user1', name: 'John Doe', department: 'Administration' },
@@ -84,23 +79,7 @@ const DepartmentsModule: React.FC = () => {
     { id: '2', name: 'Secondary Store', location: 'First Floor' }
   ];
 
-  const mockInventory = [
-    {
-      sku: 'SKU001',
-      itemName: 'Sample Item 1',
-      opening: 100,
-      added: 20,
-      total: 120,
-      out: 30,
-      closing: 90,
-      unit: industryFeatures.uoms[0] || 'pcs',
-      costPrice: 500,
-      sellingPrice: 750,
-      category: 'General'
-    }
-  ];
-
-  const mockPostingItems = mockInventory.map(item => ({
+  const mockPostingItems = inventory.map(item => ({
     sku: item.sku,
     itemName: item.itemName,
     availableQty: item.closing,
@@ -115,7 +94,7 @@ const DepartmentsModule: React.FC = () => {
     items: mockPostingItems.map(item => ({ ...item, storeName: store.name }))
   }));
 
-  const addDepartment = (formData: any) => {
+  const addDepartment = async (formData: any) => {
     const headUser = mockUsers.find(u => u.id === formData.headId);
     const department: Department = {
       id: Date.now().toString(),
@@ -129,10 +108,20 @@ const DepartmentsModule: React.FC = () => {
       itemCount: 0,
       lastActivity: new Date().toISOString().split('T')[0]
     };
-    
-    setDepartments([...departments, department]);
-    setShowAddForm(false);
-    toast({ title: "Department Created", description: `${formData.name} has been successfully created.` });
+
+    const response = await fetch(ADD_DEPARTMENT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(department)
+    })
+
+    if (response.ok){
+      setRefreshItems(true)
+      setShowAddForm(false);
+      toast({ title: "Department Created", description: `${formData.name} has been successfully created.` });
+    }    
   };
 
   const handlePosting = (entries: any[], notes: string) => {
@@ -166,7 +155,7 @@ const DepartmentsModule: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {departments.map((dept) => (
+        {departments?.map((dept) => (
           <Card key={dept.id} className="cursor-pointer hover:shadow-lg transition-shadow"
                 onClick={() => setSelectedDept(dept)}>
             <CardHeader>
@@ -207,12 +196,10 @@ const DepartmentsModule: React.FC = () => {
 
       {showAddForm && (
         <Dialog open={showAddForm} onOpenChange={setShowAddForm}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto pb-6">
             <DepartmentCreationForm
               onSubmit={addDepartment}
               onCancel={() => setShowAddForm(false)}
-              users={mockUsers}
-              stores={mockStores}
             />
           </DialogContent>
         </Dialog>
@@ -254,7 +241,7 @@ const DepartmentsModule: React.FC = () => {
               />
 
               <DepartmentInventoryTable
-                items={mockInventory}
+                items={inventory}
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
                 showPrices={true}

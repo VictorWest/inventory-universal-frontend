@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Search, Plus, Filter, Edit, Trash2 } from 'lucide-react';
 import AddItemForm from './AddItemForm';
 import { useIndustryFeatures } from '@/hooks/useIndustryConfig';
+import { ADD_INVENTORY, GET_INVOICE_LIST } from '@/shared/constants';
 
 interface InventoryItem {
   id: string;
@@ -26,44 +27,8 @@ interface InventoryItem {
 
 const InventoryList: React.FC = () => {
   const industryFeatures = useIndustryFeatures();
-  const [items, setItems] = useState<InventoryItem[]>([
-    {
-      id: '1',
-      sku: 'MED001',
-      name: 'Paracetamol 500mg',
-      category: industryFeatures.categories[0] || 'General',
-      supplier: 'PharmaCorp',
-      department: 'Pharmacy',
-      price: 50,
-      stock: 100,
-      status: 'in-stock',
-      lastUpdated: new Date()
-    },
-    {
-      id: '2',
-      sku: 'MED002',
-      name: 'Ibuprofen 400mg',
-      category: industryFeatures.categories[0] || 'General',
-      supplier: 'MedSupply',
-      department: 'Pharmacy',
-      price: 80,
-      stock: 5,
-      status: 'low-stock',
-      lastUpdated: new Date()
-    },
-    {
-      id: '3',
-      sku: 'STA001',
-      name: 'A4 Paper Ream',
-      category: industryFeatures.categories[1] || 'Office',
-      supplier: 'OfficeMax',
-      department: 'Admin',
-      price: 1200,
-      stock: 0,
-      status: 'out-of-stock',
-      lastUpdated: new Date()
-    }
-  ]);
+  const [items, setItems] = useState<InventoryItem[]>([]);
+
   const [filteredItems, setFilteredItems] = useState<InventoryItem[]>(items);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -71,6 +36,18 @@ const InventoryList: React.FC = () => {
   const [departmentFilter, setDepartmentFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
+  const [refreshItems, setRefreshItems] = useState(false)
+
+  useEffect(() => {
+    (async () => {
+      const response = await fetch(GET_INVOICE_LIST)
+
+      if (response.ok){
+        const { data } = await response.json()
+        setItems(data)
+      }
+    })()
+  }, [refreshItems])
 
   useEffect(() => {
     let filtered = items;
@@ -107,7 +84,7 @@ const InventoryList: React.FC = () => {
     setFilteredItems(filtered);
   }, [items, searchTerm, categoryFilter, supplierFilter, departmentFilter, statusFilter]);
 
-  const handleAddItem = (newItem: any) => {
+  const handleAddItem = async (newItem: any) => {
     const item: InventoryItem = {
       id: Date.now().toString(),
       sku: newItem.sku,
@@ -115,13 +92,24 @@ const InventoryList: React.FC = () => {
       category: newItem.category,
       supplier: newItem.supplier || 'Unknown',
       department: newItem.department || 'General',
-      price: newItem.price,
+      price: newItem.sellingPrice,
       stock: newItem.stock || 0,
       status: newItem.stock > 10 ? 'in-stock' : newItem.stock > 0 ? 'low-stock' : 'out-of-stock',
       lastUpdated: new Date()
     };
-    setItems(prev => [item, ...prev]);
-    setIsAddFormOpen(false);
+
+    const response = await fetch(ADD_INVENTORY, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(item)
+    })
+
+    if (response.ok){
+      setRefreshItems(true)
+      setIsAddFormOpen(false);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -148,20 +136,13 @@ const InventoryList: React.FC = () => {
           <h3 className="text-xl font-semibold">Inventory Items</h3>
           <p className="text-muted-foreground">Manage and track your inventory items</p>
         </div>
-        <Dialog open={isAddFormOpen} onOpenChange={setIsAddFormOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add New Item
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Add New Inventory Item</DialogTitle>
-            </DialogHeader>
-            <AddItemForm onSubmit={handleAddItem} />
-          </DialogContent>
-        </Dialog>
+        <div>
+          <Button onClick={() => setIsAddFormOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add New Item
+          </Button>
+          <AddItemForm isOpen={isAddFormOpen} onClose={() => setIsAddFormOpen(false)} onAdd={handleAddItem} />
+        </div>
       </div>
 
       <Card>
@@ -304,7 +285,7 @@ const InventoryList: React.FC = () => {
                   <TableCell>{item.department}</TableCell>
                   <TableCell>₦{item.price.toFixed(2)}</TableCell>
                   <TableCell>{item.stock}</TableCell>
-                  <TableCell>{getStatusBadge(item.status)}</TableCell>
+                  <TableCell>{getStatusBadge(item.status.toLowerCase())}</TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
                       <Button variant="outline" size="sm">
